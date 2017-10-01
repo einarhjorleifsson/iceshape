@@ -1,0 +1,12 @@
+Package: iceshape
+Title: A data packages containing some commonly used shapes in fisheries
+Version: 0.0.0.9000
+Authors@R: person("Einar", "Hjorleifsson", email = "einar.hjorleifsson@gmail.com", role = c("aut", "cre"))
+Description: What the package does (one paragraph).
+Depends: R (>= 3.4.1)
+License: GPL (>= 2)
+Encoding: UTF-8
+LazyData: true
+URL: http://github.com/einarhjorleifsson/iceshape
+BugReports: http://github.com/einarhjorleifsson/iceshape/issues
+RoxygenNote: 6.0.1

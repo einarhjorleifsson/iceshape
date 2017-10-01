@@ -1,0 +1,11 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.cst
+*.dbf
+*.prj
+*.shp
+*.shx
+*.zip
+wfsrequest.txt
