@@ -56,4 +56,10 @@ fao <-
 # issue solved: each shape covers unqiue area
 fao %>% ggplot() + geom_sf(fill = "red", alpha = 0.2)
 
-devtools::use_data(fao)
+library(stringr)
+colnames(fao) <- str_replace(colnames(fao), "f_", "")
+fao <-
+  fao %>%
+  select(name, ocean:surface, geometry)
+
+devtools::use_data(fao, overwrite = TRUE)
