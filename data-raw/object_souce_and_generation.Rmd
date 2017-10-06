@@ -1,0 +1,174 @@
+---
+title: "Creation of objects"
+author: "Einar Hjörleifsson"
+date: "03/10/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+```{r}
+library(sf)
+library(tidyverse)
+```
+
+## FAO areas
+
+```{r}
+url <- "http://www.fao.org/figis/geoserver/area/ows?service=WFS&request=GetFeature&version=1.0.0&typeName=area:FAO_AREAS&outputFormat=SHAPE-ZIP"
+download.file(url, destfile = "data-raw/fao_areas.zip")
+unzip("data-raw/fao_areas.zip", exdir = "data-raw")
+
+fao <-
+  read_sf("data-raw/FAO_AREAS.shp",
+          stringsAsFactors = FALSE) %>%
+  rename_all(., tolower) %>%
+  mutate(f_level = tolower(f_level))
+
+# issue: shapefiles not unique:
+fao %>% ggplot() + geom_sf(fill = "red", alpha = 0.3)
+
+# issue: size is therefor "too" big:
+object.size(fao) %>% print(units = "auto", standard = "SI")
+
+# One shape, one record
+i <- !is.na(fao$f_subunit)
+rd <- fao[i,]
+rest <- fao[!i & !fao$f_subdivis %in% rd$f_subdivis,]
+
+i <- !is.na(rest$f_subdivis)
+rd2 <- rest[i & !rest$f_subunit %in% unique(rd$f_subunit),]
+rd <- rbind(rd, rd2)
+rest <- rest[!i & !rest$f_division %in% rd$f_division,]
+
+i <- !is.na(rest$f_division)
+rd2 <- rest[i & !rest$f_subdivis %in% unique(rd$f_subdivis),]
+rd <- rbind(rd, rd2)
+rest <- rest[!i & !rest$f_subarea %in% rd$f_subarea,]
+
+i <- !is.na(rest$f_subarea)
+rd2 <- rest[i & !rest$f_division %in% unique(rd$f_division),]
+rd <- rbind(rd, rd2)
+rest <- rest[!i & !rest$f_area %in% rd$f_area,]
+
+i <- !is.na(rest$f_area)
+rd2 <- rest[i & !rest$f_subarea %in% unique(rd$f_subarea),]
+rd <- rbind(rd, rd2)
+
+# the missing piece
+miss <- fao %>% filter(f_area == "71")
+rd <- rbind(rd, miss)
+# non recognized split
+rd <- rd %>% filter(!fid %in% c(130, 133))
+# variable name constitue unique name for shapefile
+fao <-
+  rd %>%
+  mutate(name = case_when(!is.na(f_subunit) ~ f_subunit,
+                          !is.na(f_subdivis) ~ f_subdivis,
+                          !is.na(f_division) ~ f_division,
+                          !is.na(f_subarea) ~ f_subarea,
+                          TRUE ~ f_area))
+
+# issue solved: each shape covers unqiue area
+fao %>% ggplot() + geom_sf(fill = "red", alpha = 0.2)
+
+# and the size is now:
+object.size(fao) %>% print(units = "auto", standard = "SI")
+
+library(stringr)
+colnames(fao) <- str_replace(colnames(fao), "f_", "")
+
+# Create a dummy link
+link <-
+  fao %>%
+  select(name, subarea:subunit)
+st_geometry(link) <- NULL
+link <-
+  link %>%
+  gather(dummy, unit, - name) %>%
+  select(-dummy) %>%
+  arrange(name) %>%
+  drop_na()
+
+# drop uneeded columns
+fao <-
+  fao %>%
+  select(name, geometry)
+
+object.size(fao) %>% print(units = "auto", standard = "SI")
+
+devtools::use_data(fao, overwrite = TRUE)
+
+plot(fao)
+
+# so all shapes that fall into area 27.5
+faolink %>% 
+  filter(unit == "27.5") %>% 
+  left_join(fao %>% select(name)) %>%
+  st_sf() %>% 
+  select(name) %>% 
+  plot()
+devtools::use_data(faolink)
+```
+
+## Global eez
+
+```{r}
+eez <-
+  read_sf("data-raw/eez_lr.shp",
+          stringsAsFactors = FALSE) %>%
+  rename_all(., tolower)
+plot(eez[,"territory1"])
+
+devtools::use_data(eez, overwrite = TRUE)
+```
+
+## Bormicon
+
+```{r}
+bormicon <-
+  fjolst::reg.bc %>%
+  bind_rows(.id = "group") %>%
+  check_last_point() %>%        # see function below
+  sf::st_as_sf(coords = c("lon","lat")) %>%
+  sf::st_set_crs(4326) %>%
+  group_by(group) %>%
+  summarise(do_union = FALSE) %>%
+  sf::st_cast("POLYGON")  # turn MULTIPOINT TO POLYGON
+glimpse(bormicon)
+bormicon %>% plot()
+bormicon %>% ggplot() + geom_sf()
+
+devtools::use_data(bormicon, overwrite = TRUE)
+
+check_last_point <- function(df) {
+
+  groups <- df %>% pull(group) %>% unique()
+
+  res <- list()
+
+  for(i in 1:length(groups)) {
+
+    x <- df %>% filter(group == groups[i])
+
+    if(x$lat[1] != x$lat[nrow(x)]) {
+      res[[i]] <-
+        data_frame(lat = c(x$lat, x$lat[1]),
+                   lon = c(x$lon, x$lon[1]),
+                   group = c(x$group, x$group[1]))
+    } else {
+      res[[i]] <- x
+    }
+  }
+  bind_rows(res)
+}
+```
+
+## bisland
+
+```{r}
+
+```
+
